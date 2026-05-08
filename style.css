@@ -76,6 +76,39 @@ button:active {
   padding: calc(14px + env(safe-area-inset-top)) 14px calc(18px + env(safe-area-inset-bottom));
 }
 
+.auth-gate {
+  width: 100%;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: calc(18px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom));
+}
+
+.auth-card {
+  width: min(100%, 430px);
+  display: grid;
+  gap: 14px;
+  padding: 24px 20px;
+  border-radius: 28px;
+  background: var(--panel);
+  box-shadow: var(--shadow-card);
+}
+
+.auth-copy {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.auth-field {
+  margin-top: 6px;
+}
+
+.auth-status {
+  min-height: 24px;
+}
+
 .page {
   display: none;
 }

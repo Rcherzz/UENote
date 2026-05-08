@@ -1,4 +1,5 @@
-const STORAGE_KEY = "uenote-records-v5";
+const STORAGE_KEY = "uenote-records-v6";
+const PASSWORD_KEY = "uenote-session-password";
 const CONFIG = window.UENOTE_CONFIG || {};
 
 const demoRecords = [
@@ -31,9 +32,16 @@ const state = {
   selectedRecordId: null,
   currentPage: "add",
   loading: false,
+  password: "",
+  authenticated: false,
 };
 
 const els = {
+  authGate: document.querySelector("#auth-gate"),
+  passwordInput: document.querySelector("#password-input"),
+  unlockButton: document.querySelector("#unlock-button"),
+  authStatus: document.querySelector("#auth-status"),
+  appShell: document.querySelector("#app-shell"),
   pages: document.querySelectorAll(".page"),
   navButtons: document.querySelectorAll(".top-switch-button"),
   restaurantInput: document.querySelector("#restaurant-input"),
@@ -56,11 +64,94 @@ boot();
 
 async function boot() {
   renderPage();
+
+  const savedPassword = sessionStorage.getItem(PASSWORD_KEY) || "";
+  if (savedPassword) {
+    els.passwordInput.value = savedPassword;
+    await unlockWithPassword(savedPassword, false);
+    return;
+  }
+
+  lockApp();
+}
+
+function bindEvents() {
+  els.unlockButton.addEventListener("click", handleUnlock);
+  els.passwordInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      handleUnlock();
+    }
+  });
+
+  els.navButtons.forEach((button) => {
+    button.addEventListener("click", () => switchPage(button.dataset.page));
+  });
+
+  els.restaurantInput.addEventListener("input", renderSuggestions);
+  els.itemInput.addEventListener("input", renderSuggestions);
+  els.searchInput.addEventListener("input", renderRecords);
+  els.saveRecord.addEventListener("click", handleSaveRecord);
+}
+
+async function handleUnlock() {
+  const password = els.passwordInput.value.trim();
+  await unlockWithPassword(password, true);
+}
+
+async function unlockWithPassword(password, showError) {
+  if (!password) {
+    if (showError) {
+      setAuthStatus("請先輸入密碼。");
+    }
+    lockApp();
+    return;
+  }
+
+  els.unlockButton.disabled = true;
+  setAuthStatus("正在驗證密碼...");
+
+  try {
+    await apiClient.verifyAccess(password);
+    state.password = password;
+    state.authenticated = true;
+    sessionStorage.setItem(PASSWORD_KEY, password);
+    unlockApp();
+    await loadRecords();
+  } catch (error) {
+    console.error(error);
+    sessionStorage.removeItem(PASSWORD_KEY);
+    state.password = "";
+    state.authenticated = false;
+    lockApp();
+    setAuthStatus(showError ? `密碼錯誤或無法連線：${error.message || error}` : "");
+  } finally {
+    els.unlockButton.disabled = false;
+  }
+}
+
+function lockApp() {
+  els.authGate.hidden = false;
+  els.appShell.hidden = true;
+}
+
+function unlockApp() {
+  els.authGate.hidden = true;
+  els.appShell.hidden = false;
+  setAuthStatus("");
+}
+
+function setAuthStatus(message) {
+  els.authStatus.textContent = message || "";
+}
+
+async function loadRecords() {
+  state.loading = true;
   renderRecords();
   setSyncStatus(apiClient.enabled ? "正在同步資料..." : "目前是本機預覽模式。");
 
   try {
-    state.records = await apiClient.listRecords();
+    state.records = await apiClient.listRecords(state.password);
     persistLocalRecords(state.records);
     renderSuggestions();
     renderRecords();
@@ -75,18 +166,10 @@ async function boot() {
     renderSuggestions();
     renderRecords();
     setSyncStatus(`讀取失敗，先用本機資料：${error.message || error}`);
+  } finally {
+    state.loading = false;
+    renderRecords();
   }
-}
-
-function bindEvents() {
-  els.navButtons.forEach((button) => {
-    button.addEventListener("click", () => switchPage(button.dataset.page));
-  });
-
-  els.restaurantInput.addEventListener("input", renderSuggestions);
-  els.itemInput.addEventListener("input", renderSuggestions);
-  els.searchInput.addEventListener("input", renderRecords);
-  els.saveRecord.addEventListener("click", handleSaveRecord);
 }
 
 function renderPage() {
@@ -147,7 +230,7 @@ async function handleSaveRecord() {
   setSyncStatus(state.selectedRecordId ? "正在更新資料..." : "正在儲存資料...");
 
   try {
-    const savedRecord = await apiClient.saveRecord(payload);
+    const savedRecord = await apiClient.saveRecord(payload, state.password);
     upsertRecord(savedRecord);
     persistLocalRecords(state.records);
     clearForm();
@@ -257,7 +340,7 @@ async function handleDeleteRecord(recordId) {
   setSyncStatus("正在刪除資料...");
 
   try {
-    await apiClient.deleteRecord(recordId);
+    await apiClient.deleteRecord(recordId, state.password);
     state.records = state.records.filter((entry) => entry.id !== recordId);
     persistLocalRecords(state.records);
     if (state.selectedRecordId === recordId) {
@@ -412,22 +495,27 @@ function iconMarkup(type) {
 
 function createApiClient(config) {
   const apiUrl = String(config.apiUrl || "").trim();
-  const apiToken = String(config.apiToken || "").trim();
+  const previewPassword = String(config.previewPassword || "demo").trim();
   const enabled = Boolean(apiUrl);
 
   if (!enabled) {
     return {
       enabled: false,
+      async verifyAccess(password) {
+        if (password !== previewPassword) {
+          throw new Error("密碼錯誤");
+        }
+        return { ok: true };
+      },
       async listRecords() {
         return loadLocalRecords();
       },
       async saveRecord(record) {
-        const saved = normalizeRecord({
+        return normalizeRecord({
           ...record,
           id: record.id || createId(),
           updatedAt: new Date().toISOString(),
         });
-        return saved;
       },
       async deleteRecord() {
         return { ok: true };
@@ -437,19 +525,27 @@ function createApiClient(config) {
 
   return {
     enabled: true,
-    async listRecords() {
+    async verifyAccess(password) {
       try {
-        const data = await fetchJson(buildApiUrl(apiUrl, "records", { token: apiToken }));
+        const data = await fetchJson(buildApiUrl(apiUrl, "ping", { password }));
+        return data;
+      } catch (error) {
+        return await loadJsonp(buildApiUrl(apiUrl, "ping", { password }));
+      }
+    },
+    async listRecords(password) {
+      try {
+        const data = await fetchJson(buildApiUrl(apiUrl, "records", { password }));
         return normalizeRecordsFromApi(data.records);
       } catch (error) {
-        const data = await loadJsonp(buildApiUrl(apiUrl, "records", { token: apiToken }));
+        const data = await loadJsonp(buildApiUrl(apiUrl, "records", { password }));
         return normalizeRecordsFromApi(data.records);
       }
     },
-    async saveRecord(record) {
+    async saveRecord(record, password) {
       const payload = {
         action: "saveRecord",
-        token: apiToken,
+        password,
         record,
       };
 
@@ -458,16 +554,16 @@ function createApiClient(config) {
         return normalizeRecord(data.record || record);
       } catch (error) {
         const data = await loadJsonp(buildApiUrl(apiUrl, "saveRecord", {
-          token: apiToken,
+          password,
           record: JSON.stringify(record),
         }));
         return normalizeRecord(data.record || record);
       }
     },
-    async deleteRecord(recordId) {
+    async deleteRecord(recordId, password) {
       const payload = {
         action: "deleteRecord",
-        token: apiToken,
+        password,
         id: recordId,
       };
 
@@ -475,7 +571,7 @@ function createApiClient(config) {
         return await postJson(apiUrl, payload);
       } catch (error) {
         return await loadJsonp(buildApiUrl(apiUrl, "deleteRecord", {
-          token: apiToken,
+          password,
           id: recordId,
         }));
       }

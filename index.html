@@ -9,10 +9,33 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=github-pages-ready-1">
+  <link rel="stylesheet" href="style.css?v=password-gate-1">
 </head>
 <body>
-  <main class="app-shell">
+  <section id="auth-gate" class="auth-gate">
+    <div class="auth-card">
+      <p class="brand-kicker">食記帳</p>
+      <h1>UENote</h1>
+      <p class="auth-copy">輸入密碼後，才會顯示記錄頁面。</p>
+      <label class="field-group auth-field">
+        <span class="field-label">
+          <span class="field-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" class="ui-icon">
+              <rect x="5.5" y="10.25" width="13" height="9.25" rx="2.25"></rect>
+              <path d="M8.5 10.25V8.5a3.5 3.5 0 1 1 7 0v1.75"></path>
+              <circle cx="12" cy="14.75" r="1"></circle>
+            </svg>
+          </span>
+          <span>密碼</span>
+        </span>
+        <input id="password-input" type="password" placeholder="請輸入密碼" autocomplete="current-password">
+      </label>
+      <button id="unlock-button" class="primary-button" type="button">進入 UENote</button>
+      <p id="auth-status" class="status-text auth-status"></p>
+    </div>
+  </section>
+
+  <main id="app-shell" class="app-shell" hidden>
     <section id="page-add" class="page is-active">
       <header class="topbar">
         <div class="brand-block">

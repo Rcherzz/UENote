@@ -15,7 +15,7 @@ const HEADERS = [
   "createdAt",
   "updatedAt",
 ];
-const API_TOKEN_KEY = "UENOTE_API_TOKEN";
+const APP_PASSWORD_KEY = "UENOTE_APP_PASSWORD";
 
 function doGet(e) {
   if (isApiRequest_(e)) {
@@ -43,7 +43,7 @@ function doGet(e) {
         "<div class='card'>",
         "<h1>UENote Backend</h1>",
         "<p>這個 Apps Script 現在只負責資料 API。</p>",
-        "<p>前端請改從 GitHub Pages 或其他靜態網站開啟，再用這個網址當資料來源。</p>",
+        "<p>請在 GitHub Pages 前端輸入密碼後，再透過這個網址讀寫資料。</p>",
         "<p>測試用：<code>?api=ping</code></p>",
         "</div>",
         "</body>",
@@ -208,9 +208,7 @@ function saveRecordInternal_(record) {
 
   if (existingIndex >= 0) {
     payload.createdAt = rows[existingIndex][7] || payload.createdAt || now;
-    sheet
-      .getRange(existingIndex + 1, 1, 1, HEADERS.length)
-      .setValues([recordToRow_(payload)]);
+    sheet.getRange(existingIndex + 1, 1, 1, HEADERS.length).setValues([recordToRow_(payload)]);
     return payload;
   }
 
@@ -262,12 +260,12 @@ function assertAllowedUser_() {
 }
 
 function assertApiAccess_(e, payload) {
-  const configuredToken = getConfiguredApiToken_();
-  const suppliedToken = extractToken_(e, payload);
+  const configuredPassword = getConfiguredPassword_();
 
-  if (configuredToken) {
-    if (suppliedToken !== configuredToken) {
-      throw new Error("Invalid API token");
+  if (configuredPassword) {
+    const suppliedPassword = extractPassword_(e, payload);
+    if (suppliedPassword !== configuredPassword) {
+      throw new Error("Invalid password");
     }
     return;
   }
@@ -275,18 +273,18 @@ function assertApiAccess_(e, payload) {
   assertAllowedUser_();
 }
 
-function getConfiguredApiToken_() {
+function getConfiguredPassword_() {
   return String(
     PropertiesService
       .getScriptProperties()
-      .getProperty(API_TOKEN_KEY) || ""
+      .getProperty(APP_PASSWORD_KEY) || ""
   ).trim();
 }
 
-function extractToken_(e, payload) {
+function extractPassword_(e, payload) {
   return String(
-    (payload && (payload.token || payload.secret)) ||
-    (e && e.parameter && (e.parameter.token || e.parameter.secret)) ||
+    (payload && payload.password) ||
+    (e && e.parameter && e.parameter.password) ||
     ""
   ).trim();
 }

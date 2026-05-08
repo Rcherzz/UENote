@@ -1,66 +1,69 @@
 # UENote
 
-UENote 現在改成這個架構：
+UENote 現在使用這個架構：
 
 - 前端：GitHub Pages 或其他靜態網站
 - 後端：Google Apps Script Web App
 - 資料庫：Google Sheets
 
-這樣做的好處是：
+## 現在的登入方式
 
-- 前端樣式可自由調整，不再受 Apps Script 畫面限制
-- Google Sheets 仍保留成最直覺的資料庫
-- 只要更新靜態檔案，就能改前端版面
+網站打開後，會先顯示密碼頁。
 
-## 專案檔案
+- 前端必須先輸入密碼
+- Apps Script 後端也會驗證同一組密碼
+- 密碼正確後才會顯示頁面，並允許讀寫資料
 
-前端主要使用：
+這樣比把 token 直接寫在前端安全很多。
+
+## 前端檔案
 
 - `index.html`
 - `style.css`
 - `app.js`
 - `config.js`
 
-Apps Script 後端主要使用：
+## Apps Script 後端檔案
 
 - `apps-script/Code.gs`
 
-## 前端設定
+## config.js
 
-`config.js` 目前是空白設定：
+本機預覽時可先這樣：
 
 ```js
 window.UENOTE_CONFIG = {
   apiUrl: "",
-  apiToken: "",
+  previewPassword: "demo",
 };
 ```
 
-部署前請填入：
+正式上線時請填入：
 
-- `apiUrl`
-  Apps Script Web App 的正式網址
-- `apiToken`
-  你在 Apps Script `Script Properties` 裡設定的共享 token
+```js
+window.UENOTE_CONFIG = {
+  apiUrl: "你的 Apps Script Web App 網址",
+  previewPassword: "demo",
+};
+```
 
-範例可看：
+`previewPassword` 只在沒有接後端時使用。  
+正式連到 Apps Script 後，真正的驗證會以後端密碼為準。
 
-- `config.example.js`
+## Apps Script 設定
 
-## Apps Script 後端設定
-
-1. 打開你的 Google Sheet  
+1. 打開 Google Sheet  
    `https://docs.google.com/spreadsheets/d/1jXY0Yr06seR-oqAuMd6pPAZRnImOm4h9x5YvXpIgtUI/edit`
 
-2. 開啟 `擴充功能 -> Apps Script`
+2. 打開 `擴充功能 -> Apps Script`
 
-3. 只需要更新：
+3. 更新：
    - `Code.gs`
 
 4. 到 `專案設定 -> 指令碼屬性` 新增：
 
 ```text
-UENOTE_API_TOKEN = 你自訂的一串字
+UENOTE_APP_PASSWORD = 你要使用的密碼
 ```
 
 5. 重新部署 Web App
@@ -82,29 +85,18 @@ id | restaurant | item | type | note | author | source | createdAt | updatedAt
 
 Apps Script Web App 現在支援：
 
-- `GET ?api=ping`
-- `GET ?api=records&token=...`
-- `POST { action: "saveRecord", token, record }`
-- `POST { action: "deleteRecord", token, id }`
+- `GET ?api=ping&password=...`
+- `GET ?api=records&password=...`
+- `POST { action: "saveRecord", password, record }`
+- `POST { action: "deleteRecord", password, id }`
 
-另外也保留 JSONP / GET fallback，讓 GitHub Pages 與 Apps Script 跨網域時更穩：
+另外也保留 JSONP / GET fallback：
 
-- `GET ?api=saveRecord&token=...&record=...&callback=...`
-- `GET ?api=deleteRecord&token=...&id=...&callback=...`
-
-## GitHub Pages 部署方向
-
-建議把這些檔案放到 GitHub repo 根目錄：
-
-- `index.html`
-- `style.css`
-- `app.js`
-- `config.js`
-- `uenote-icon.png`
-
-之後在 GitHub 開啟 Pages 即可。
+- `GET ?api=saveRecord&password=...&record=...&callback=...`
+- `GET ?api=deleteRecord&password=...&id=...&callback=...`
 
 ## 注意
 
-- `config.js` 裡的 token 會存在前端，所以這是「方便共享」而不是高安全等級方案。
-- 如果之後要更安全，建議再補登入或改成更正式的後端。
+- repo 如果是 public，別人可以看到你的前端原始碼
+- 但現在前端不再保存真正的後端密碼
+- 真正可寫入的判斷在 Apps Script 後端
