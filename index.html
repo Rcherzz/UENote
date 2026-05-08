@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>UENote</title>
+  <link rel="icon" type="image/png" href="https://drive.google.com/uc?export=view&id=1ecxn-T5NP-1z_dDNohqvTPsbnboPZyol">
+  <link rel="apple-touch-icon" href="https://drive.google.com/uc?export=view&id=1ecxn-T5NP-1z_dDNohqvTPsbnboPZyol">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=github-pages-ready-1">
+</head>
+<body>
+  <main class="app-shell">
+    <section id="page-add" class="page is-active">
+      <header class="topbar">
+        <div class="brand-block">
+          <p class="brand-kicker">食記帳</p>
+          <h1>UENote</h1>
+        </div>
+        <div class="top-switch" role="tablist" aria-label="頁面切換">
+          <button class="top-switch-button is-active" data-page="add" type="button">新增記錄</button>
+          <button class="top-switch-button" data-page="list" type="button">查看記錄</button>
+        </div>
+      </header>
+
+      <section class="content-card form-card">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Entry</p>
+            <h2 class="section-title">新增記錄</h2>
+          </div>
+          <p id="sync-status" class="status-text"></p>
+        </div>
+
+        <div class="form-grid">
+          <label class="field-group">
+            <span class="field-label">
+              <span class="field-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" class="ui-icon">
+                  <path d="M4.5 10.75 12 4.75l7.5 6v8A1.25 1.25 0 0 1 18.25 20h-4.5v-5h-3.5v5h-4.5A1.25 1.25 0 0 1 4.5 18.75Z"></path>
+                </svg>
+              </span>
+              <span>店家</span>
+            </span>
+            <input id="restaurant-input" list="restaurant-suggestions" placeholder="輸入店家名稱" autocomplete="off">
+            <datalist id="restaurant-suggestions"></datalist>
+          </label>
+
+          <label class="field-group">
+            <span class="field-label">
+              <span class="field-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" class="ui-icon">
+                  <path d="M7 3.75v7.5"></path>
+                  <path d="M10 3.75v7.5"></path>
+                  <path d="M7 7.5h3"></path>
+                  <path d="M15 3.75V20.25"></path>
+                  <path d="M18.5 3.75c1.15 1.55 1.55 3.15 1.2 4.8-.35 1.4-1.25 2.65-2.7 3.7"></path>
+                </svg>
+              </span>
+              <span>餐點</span>
+            </span>
+            <input id="item-input" list="item-suggestions" placeholder="輸入餐點名稱" autocomplete="off">
+            <datalist id="item-suggestions"></datalist>
+          </label>
+
+          <div class="compact-row">
+            <label class="field-group">
+              <span class="field-label">
+                <span class="field-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" class="ui-icon">
+                    <path d="M6.75 8.25h7.5l3.5 3.5-7.5 7.5-3.5-3.5Z"></path>
+                    <circle cx="9.75" cy="11.25" r="1"></circle>
+                  </svg>
+                </span>
+                <span>類型</span>
+              </span>
+              <input id="type-input" type="text" placeholder="例如：早餐、回購" autocomplete="off">
+            </label>
+
+            <label class="field-group">
+              <span class="field-label">
+                <span class="field-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" class="ui-icon">
+                    <path d="M12 12.25a3.75 3.75 0 1 0-3.75-3.75A3.75 3.75 0 0 0 12 12.25Z"></path>
+                    <path d="M5.25 19.25a6.75 6.75 0 0 1 13.5 0"></path>
+                  </svg>
+                </span>
+                <span>使用者</span>
+              </span>
+              <select id="author-input">
+                <option value="R">R</option>
+                <option value="Joey">Joey</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="field-group">
+            <span class="field-label">
+              <span class="field-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" class="ui-icon">
+                  <path d="M5 5.25A1.25 1.25 0 0 1 6.25 4h9.25L19 7.5v11.25A1.25 1.25 0 0 1 17.75 20H6.25A1.25 1.25 0 0 1 5 18.75Z"></path>
+                  <path d="M15.5 4v4h4"></path>
+                  <path d="M8 11.5h8"></path>
+                  <path d="M8 15h5.5"></path>
+                </svg>
+              </span>
+              <span>備註</span>
+            </span>
+            <textarea id="note-input" rows="4" placeholder="可不填"></textarea>
+          </label>
+
+          <button id="save-record" class="primary-button" type="button">儲存記錄</button>
+        </div>
+      </section>
+    </section>
+
+    <section id="page-list" class="page">
+      <header class="topbar">
+        <div class="brand-block">
+          <p class="brand-kicker">記錄庫</p>
+          <h1>UENote</h1>
+        </div>
+        <div class="top-switch" role="tablist" aria-label="頁面切換">
+          <button class="top-switch-button" data-page="add" type="button">新增記錄</button>
+          <button class="top-switch-button is-active" data-page="list" type="button">查看記錄</button>
+        </div>
+      </header>
+
+      <section class="content-card">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Archive</p>
+            <h2 class="section-title">查看記錄</h2>
+          </div>
+        </div>
+
+        <label class="field-group search-group">
+          <span class="field-label">
+            <span class="field-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" class="ui-icon">
+                <circle cx="11" cy="11" r="5.5"></circle>
+                <path d="m16 16 4 4"></path>
+              </svg>
+            </span>
+            <span>搜尋</span>
+          </span>
+          <input id="search-input" placeholder="搜尋店家、餐點、類型、備註" autocomplete="off">
+        </label>
+
+        <div id="record-list" class="record-list"></div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    window.UENOTE_CONFIG = window.UENOTE_CONFIG || {};
+  </script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

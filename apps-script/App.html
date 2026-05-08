@@ -1,0 +1,327 @@
+<script>
+const state = {
+  records: [],
+  selectedRecordId: null,
+  currentPage: "add",
+  loading: false,
+};
+
+const els = {
+  pages: document.querySelectorAll(".page"),
+  navButtons: document.querySelectorAll(".top-switch-button"),
+  restaurantInput: document.querySelector("#restaurant-input"),
+  itemInput: document.querySelector("#item-input"),
+  typeInput: document.querySelector("#type-input"),
+  authorInput: document.querySelector("#author-input"),
+  noteInput: document.querySelector("#note-input"),
+  restaurantSuggestions: document.querySelector("#restaurant-suggestions"),
+  itemSuggestions: document.querySelector("#item-suggestions"),
+  saveRecord: document.querySelector("#save-record"),
+  searchInput: document.querySelector("#search-input"),
+  recordList: document.querySelector("#record-list"),
+  syncStatus: document.querySelector("#sync-status"),
+};
+
+bindEvents();
+loadRecords();
+
+function bindEvents() {
+  els.navButtons.forEach((button) => {
+    button.addEventListener("click", () => switchPage(button.dataset.page));
+  });
+
+  els.restaurantInput.addEventListener("input", renderSuggestions);
+  els.itemInput.addEventListener("input", renderSuggestions);
+  els.searchInput.addEventListener("input", renderRecords);
+  els.saveRecord.addEventListener("click", saveRecord);
+}
+
+function loadRecords() {
+  state.loading = true;
+  renderPage();
+  renderRecords();
+  setSyncStatus("正在讀取 Google Sheets...");
+
+  google.script.run
+    .withSuccessHandler((records) => {
+      state.records = Array.isArray(records) ? records : [];
+      state.loading = false;
+      renderSuggestions();
+      renderRecords();
+      setSyncStatus(`已同步 ${state.records.length} 筆記錄`);
+    })
+    .withFailureHandler((error) => {
+      state.loading = false;
+      renderRecords();
+      setSyncStatus(`讀取失敗：${error && error.message ? error.message : error}`);
+    })
+    .listRecords();
+}
+
+function renderAll() {
+  renderPage();
+  renderSuggestions();
+  renderRecords();
+}
+
+function renderPage() {
+  els.pages.forEach((page) => {
+    page.classList.toggle("is-active", page.id === `page-${state.currentPage}`);
+  });
+
+  els.navButtons.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.page === state.currentPage);
+  });
+}
+
+function switchPage(pageName) {
+  state.currentPage = pageName;
+  renderPage();
+}
+
+function renderSuggestions() {
+  const restaurants = unique(
+    state.records.map((record) => record.restaurant).filter(Boolean)
+  );
+  const items = getSuggestedItems();
+
+  fillDatalist(
+    els.restaurantSuggestions,
+    filterByKeyword(restaurants, els.restaurantInput.value.trim())
+  );
+  fillDatalist(
+    els.itemSuggestions,
+    filterByKeyword(items, els.itemInput.value.trim())
+  );
+}
+
+function saveRecord() {
+  const restaurant = els.restaurantInput.value.trim();
+  const item = els.itemInput.value.trim();
+
+  if (!restaurant || !item) {
+    window.alert("請先填入店家與餐點。");
+    return;
+  }
+
+  const record = {
+    id: state.selectedRecordId || "",
+    restaurant,
+    item,
+    type: els.typeInput.value.trim(),
+    author: els.authorInput.value || "R",
+    note: els.noteInput.value.trim(),
+    source: "manual",
+  };
+
+  els.saveRecord.disabled = true;
+  setSyncStatus(state.selectedRecordId ? "正在更新 Google Sheets..." : "正在寫入 Google Sheets...");
+
+  google.script.run
+    .withSuccessHandler(() => {
+      els.saveRecord.disabled = false;
+      clearForm();
+      switchPage("list");
+      setSyncStatus("已儲存記錄。");
+      loadRecords();
+    })
+    .withFailureHandler((error) => {
+      els.saveRecord.disabled = false;
+      setSyncStatus(`儲存失敗：${error && error.message ? error.message : error}`);
+    })
+    .saveRecord(record);
+}
+
+function renderRecords() {
+  if (state.loading) {
+    els.recordList.innerHTML = `
+      <article class="record-card">
+        <p class="record-title">讀取中...</p>
+      </article>
+    `;
+    return;
+  }
+
+  const keyword = (els.searchInput.value || "").trim().toLowerCase();
+  const filtered = state.records.filter((record) => {
+    const corpus = `${record.restaurant} ${record.item} ${record.type} ${record.note} ${record.author}`.toLowerCase();
+    return corpus.includes(keyword);
+  });
+
+  if (!filtered.length) {
+    els.recordList.innerHTML = `
+      <article class="record-card">
+        <p class="record-title">尚未有記錄</p>
+        <p class="record-subtitle">先在新增記錄頁面存入第一筆資料。</p>
+      </article>
+    `;
+    return;
+  }
+
+  els.recordList.innerHTML = filtered.map((record) => {
+    const noteText = record.note && record.note.trim() ? record.note.trim() : "無備註";
+    return `
+      <article class="record-card">
+        <div class="record-top">
+          <div>
+            <p class="record-title">${escapeHtml(record.item)}</p>
+            <p class="record-subtitle">${escapeHtml(record.restaurant)}</p>
+          </div>
+          <div class="record-actions">
+            <button class="icon-button" data-action="edit" data-id="${escapeAttribute(record.id)}" type="button" aria-label="編輯" title="編輯">
+              ${iconMarkup("edit")}
+            </button>
+            <button class="icon-button danger-button" data-action="delete" data-id="${escapeAttribute(record.id)}" type="button" aria-label="刪除" title="刪除">
+              ${iconMarkup("delete")}
+            </button>
+          </div>
+        </div>
+        <div class="record-meta">
+          <span class="record-chip">${iconMarkup("tag")}${escapeHtml(record.type || "未分類")}</span>
+          <span class="record-chip">${iconMarkup("user")}${escapeHtml(record.author)}</span>
+          <span class="record-chip">${iconMarkup("clock")}${escapeHtml(formatDisplayTime(record.updatedAt))}</span>
+        </div>
+        <p class="record-subtitle">${escapeHtml(noteText)}</p>
+      </article>
+    `;
+  }).join("");
+
+  document.querySelectorAll('[data-action="edit"]').forEach((button) => {
+    button.addEventListener("click", () => loadRecordIntoForm(button.dataset.id));
+  });
+
+  document.querySelectorAll('[data-action="delete"]').forEach((button) => {
+    button.addEventListener("click", () => deleteRecord(button.dataset.id));
+  });
+}
+
+function loadRecordIntoForm(recordId) {
+  const record = state.records.find((entry) => entry.id === recordId);
+  if (!record) {
+    return;
+  }
+
+  state.selectedRecordId = record.id;
+  els.restaurantInput.value = record.restaurant;
+  els.itemInput.value = record.item;
+  els.typeInput.value = record.type || "";
+  els.authorInput.value = record.author || "R";
+  els.noteInput.value = record.note || "";
+  renderSuggestions();
+  switchPage("add");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  setSyncStatus("已載入這筆記錄，可以直接修改後再儲存。");
+}
+
+function deleteRecord(recordId) {
+  const record = state.records.find((entry) => entry.id === recordId);
+  if (!record) {
+    return;
+  }
+
+  if (!window.confirm(`要刪除「${record.item}」嗎？`)) {
+    return;
+  }
+
+  setSyncStatus("正在刪除記錄...");
+
+  google.script.run
+    .withSuccessHandler(() => {
+      if (state.selectedRecordId === recordId) {
+        clearForm();
+      }
+      setSyncStatus("已刪除記錄。");
+      loadRecords();
+    })
+    .withFailureHandler((error) => {
+      setSyncStatus(`刪除失敗：${error && error.message ? error.message : error}`);
+    })
+    .deleteRecord(recordId);
+}
+
+function clearForm() {
+  state.selectedRecordId = null;
+  els.restaurantInput.value = "";
+  els.itemInput.value = "";
+  els.typeInput.value = "";
+  els.authorInput.value = "R";
+  els.noteInput.value = "";
+}
+
+function setSyncStatus(message) {
+  els.syncStatus.textContent = message || "";
+}
+
+function fillDatalist(element, items) {
+  element.innerHTML = items
+    .slice(0, 10)
+    .map((item) => `<option value="${escapeAttribute(item)}"></option>`)
+    .join("");
+}
+
+function filterByKeyword(items, keyword) {
+  if (!keyword) {
+    return items;
+  }
+
+  const normalizedKeyword = keyword.toLowerCase();
+  return items.filter((item) => item.toLowerCase().includes(normalizedKeyword));
+}
+
+function getSuggestedItems() {
+  const restaurant = els.restaurantInput.value.trim();
+  if (!restaurant) {
+    return unique(state.records.map((record) => record.item).filter(Boolean));
+  }
+
+  return unique(
+    state.records
+      .filter((record) => record.restaurant === restaurant)
+      .map((record) => record.item)
+      .filter(Boolean)
+  );
+}
+
+function formatDisplayTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  const hour = `${date.getHours()}`.padStart(2, "0");
+  const minute = `${date.getMinutes()}`.padStart(2, "0");
+  return `${year}-${month}-${day} ${hour}:${minute}`;
+}
+
+function unique(items) {
+  return [...new Set(items)];
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value);
+}
+
+function iconMarkup(type) {
+  const paths = {
+    edit: '<path d="m4 20 4.5-1 9.25-9.25a1.75 1.75 0 0 0 0-2.5l-1-1a1.75 1.75 0 0 0-2.5 0L5 15.5 4 20Z"></path><path d="M12.5 7.5 16.5 11.5"></path>',
+    delete: '<path d="M5.5 7.5h13"></path><path d="M9 7.5V5.75A1.25 1.25 0 0 1 10.25 4.5h3.5A1.25 1.25 0 0 1 15 5.75V7.5"></path><path d="M8.5 10.5v6"></path><path d="M12 10.5v6"></path><path d="M15.5 10.5v6"></path><path d="M6.5 7.5v10.75A1.25 1.25 0 0 0 7.75 19.5h8.5A1.25 1.25 0 0 0 17.5 18.25V7.5"></path>',
+    tag: '<path d="M6.75 8.25h7.5l3.5 3.5-7.5 7.5-3.5-3.5Z"></path><circle cx="9.75" cy="11.25" r="1"></circle>',
+    user: '<path d="M12 12.25a3.75 3.75 0 1 0-3.75-3.75A3.75 3.75 0 0 0 12 12.25Z"></path><path d="M5.25 19.25a6.75 6.75 0 0 1 13.5 0"></path>',
+    clock: '<circle cx="12" cy="12" r="8"></circle><path d="M12 7.75v4.5l3 1.75"></path>',
+  };
+
+  return `<svg viewBox="0 0 24 24" class="ui-icon">${paths[type] || ""}</svg>`;
+}
+</script>
