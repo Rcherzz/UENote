@@ -49,6 +49,10 @@ body::after {
   mix-blend-mode: soft-light;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 input,
 select,
 textarea,
