@@ -139,6 +139,9 @@ function unlockApp() {
   els.authGate.hidden = true;
   els.appShell.hidden = false;
   setAuthStatus("");
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
 }
 
 function setAuthStatus(message) {
